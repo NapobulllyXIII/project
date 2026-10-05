@@ -88,8 +88,8 @@ function init(cfg){
         try{
           const r=await fetch(base+p);
           if(!r.ok){lastErr='errore '+r.status;continue}
-          const j=await r.json();console.log('GoatCounter',p,JSON.stringify(j));const v=parseInt(String(j.count).replace(/\D/g,''),10);
-          if(!isNaN(v)){n=v;return}
+          const j=await r.json();console.log('GoatCounter',p,JSON.stringify(j));const num=x=>parseInt(String(x).replace(/\D/g,''),10)||0;const v=Math.max(num(j.count),num(j.count_unique));
+          if(j.count!==undefined||j.count_unique!==undefined){n=v;return}
         }catch(e){lastErr='richiesta bloccata'}
       }
       console.warn('Contatore non disponibile:',lastErr,'-',base+'TOTAL.json');
