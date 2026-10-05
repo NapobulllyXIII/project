@@ -33,7 +33,7 @@ nav button:hover i,nav button.on i{transform:scale(1.5)}
 #cnt i{width:8px;height:8px;animation:bip 3s ease-in-out infinite;border-radius:50%;background:var(--ink);box-shadow:0 0 8px var(--ink)}
 #cnt span{max-width:0;overflow:hidden;white-space:nowrap;transition:max-width .6s cubic-bezier(.2,.9,.2,1)}
 #cnt:hover,#cnt:focus{opacity:1;gap:8px;padding-inline:12px;background:rgba(15,18,40,.65);border-color:rgba(255,255,255,.14)}
-#cnt:hover span,#cnt:focus span{max-width:170px}
+#cnt:hover span,#cnt:focus span{max-width:280px}
 #cnt[hidden]{display:none}
 @keyframes bip{50%{opacity:.35}}
 #err{position:fixed;z-index:5;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);width:min(560px,calc(100vw - 32px));padding:14px 18px;border-radius:14px;background:rgba(60,12,20,.9);border:1px solid #ff6b81;color:#ffd9de;font-size:.9rem;line-height:1.5;backdrop-filter:blur(8px)}
@@ -81,11 +81,22 @@ function init(cfg){
     const el=$('cnt'),sp=el.querySelector('span');el.hidden=false;
     if(!hasTag){const sc=document.createElement('script');sc.async=true;sc.dataset.goatcounter='https://'+code+'.goatcounter.com/count';sc.src='//gc.zgo.at/count.js';document.head.appendChild(sc)}
     let n=null,shown=false,t0=0;
-    const load=()=>fetch('https://'+code+'.goatcounter.com/counter/TOTAL.json').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
-      .then(j=>{n=parseInt(String(j.count).replace(/\D/g,''),10);if(isNaN(n))n=null}).catch(e=>console.warn('Contatore non disponibile:',e.message));
-    const anim=()=>{if(n==null){sp.textContent='non disponibile';return}
+    let lastErr='',last=0;
+    const load=async()=>{last=Date.now();
+      const base='https://'+code+'.goatcounter.com/counter/';
+      for(const p of ['TOTAL.json','/.json']){
+        try{
+          const r=await fetch(base+p);
+          if(!r.ok){lastErr='errore '+r.status;continue}
+          const j=await r.json();console.log('GoatCounter',p,JSON.stringify(j));const v=parseInt(String(j.count).replace(/\D/g,''),10);
+          if(!isNaN(v)){n=v;return}
+        }catch(e){lastErr='richiesta bloccata'}
+      }
+      console.warn('Contatore non disponibile:',lastErr,'-',base+'TOTAL.json');
+    };
+    const anim=()=>{if(n==null){sp.textContent='non disponibile ('+lastErr+')';return}
       shown=true;t0=performance.now();(function f(now){const k=Math.min((now-t0)/900,1);sp.textContent=Math.round(n*(1-Math.pow(1-k,3))).toLocaleString('it-IT')+' visite';if(k<1)requestAnimationFrame(f)})(t0)};
-    const show=()=>{if(shown)return;sp.textContent='...';(n==null?load():Promise.resolve()).then(anim)};
+    const show=()=>{if(shown&&Date.now()-last<5000)return;sp.textContent='...';load().then(anim)};
     setTimeout(load,1800);
     el.addEventListener('pointerenter',show);el.addEventListener('focus',show);
   }
