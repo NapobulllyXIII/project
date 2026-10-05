@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sistema solare aziendale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#05060f;--ink:#eef1ff;--dim:#8d94b8;--accent:#ffb347;box-sizing:border-box}
+*{box-sizing:inherit;margin:0}
+html,body{height:100%;background:var(--bg);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+canvas.over{cursor:pointer}
+header{position:fixed;top:0;left:0;padding:calc(28px + env(safe-area-inset-top,0px)) 32px 0;pointer-events:none;z-index:2}
+h1{font:800 clamp(1.6rem,4vw,2.8rem)/1.05 'Syne',sans-serif;letter-spacing:-.02em}
+h1.vuoto{color:transparent;-webkit-text-stroke:1.5px rgba(238,241,255,.45)}
+header p{margin-top:10px;color:var(--dim);max-width:30ch}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:2;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:0 20px calc(20px + env(safe-area-inset-bottom,0px))}
+nav button{font:500 .85rem 'Instrument Sans',sans-serif;color:var(--ink);background:rgba(15,18,40,.6);border:1px solid rgba(255,255,255,.12);border-radius:99px;padding:7px 14px 7px 10px;display:flex;align-items:center;gap:8px;cursor:pointer;backdrop-filter:blur(8px);transition:transform .25s,border-color .25s,background .25s}
+nav button i{width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c);transition:transform .25s}
+nav button:hover,nav button.on,nav button:focus-visible{border-color:var(--c);background:rgba(25,28,60,.85);transform:translateY(-3px);outline:none}
+nav button:hover i,nav button.on i{transform:scale(1.5)}
+#panel{position:fixed;z-index:3;right:28px;top:50%;width:min(340px,calc(100vw - 40px));padding:26px;border-radius:20px;background:rgba(10,12,30,.72);border:1px solid var(--c,#fff3);backdrop-filter:blur(16px);box-shadow:0 0 60px -10px var(--c,#000);opacity:0;pointer-events:none;transform:translate(40px,-50%) scale(.96);transition:opacity .45s,transform .55s cubic-bezier(.2,.9,.2,1)}
+#panel.open{opacity:1;pointer-events:auto;transform:translate(0,-50%) scale(1)}
+#panel h2{font:800 1.7rem/1.1 'Syne',sans-serif;color:var(--c)}
+#panel p{margin-top:12px;line-height:1.55;color:#cfd4ef}
+#panel button{position:absolute;top:12px;right:14px;background:none;border:0;color:var(--dim);font-size:1.4rem;cursor:pointer;line-height:1}
+#panel button:hover{color:var(--ink)}
+@media (max-width:640px){#panel{right:50%;top:auto;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translate(50%,40px) scale(.96)}#panel.open{transform:translate(50%,0) scale(1)}header{padding-inline:20px}}
+#err{position:fixed;z-index:5;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);width:min(560px,calc(100vw - 32px));padding:14px 18px;border-radius:14px;background:rgba(60,12,20,.9);border:1px solid #ff6b81;color:#ffd9de;font-size:.9rem;line-height:1.5;backdrop-filter:blur(8px)}
+#err b{display:block;margin-bottom:4px;color:#fff}
+#err[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01s!important}}
+</style>
+</head>
+<body>
+<canvas id="c" aria-hidden="true"></canvas>
+<header><h1 id="titolo"></h1><p id="slogan"></p></header>
+<aside id="panel" role="dialog" aria-live="polite"><button id="chiudi" aria-label="Chiudi">&times;</button><h2 id="pn"></h2><p id="pd"></p></aside>
+<div id="err" role="alert" hidden></div>
+<nav id="nav" aria-label="Dipartimenti"></nav>
+<script>
+const FALLBACK={azienda:"",segnapostoAzienda:"Il nome è in arrivo",slogan:"Ogni dipartimento ha la sua orbita.",dipartimenti:[
+{nome:"Ricerca e Sviluppo",descrizione:"Dove nascono le idee.",colore:"#6ea8ff",dimensione:15,velocita:.55},
+{nome:"Design",descrizione:"Forma ed esperienza.",colore:"#ff7ab6",dimensione:13,velocita:.42},
+{nome:"Marketing",descrizione:"Raccontiamo il progetto.",colore:"#ffb347",dimensione:17,velocita:.34,anello:true},
+{nome:"Operazioni",descrizione:"Processi e logistica.",colore:"#a78bfa",dimensione:18,velocita:.21}]};
+
+fetch('config.json',{cache:'no-store'})
+  .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
+  .then(c=>({c}),e=>({e}))
+  .then(({c,e})=>{
+    if(c&&!(Array.isArray(c.dipartimenti)&&c.dipartimenti.length)){e=new Error('manca la lista "dipartimenti" o è vuota')}
+    if(e)showError(e);
+    init(e?FALLBACK:c);
+  });
+function showError(e){
+  const box=document.getElementById('err');let msg;
+  if(location.protocol==='file:')msg='Hai aperto index.html direttamente dal computer: il browser blocca la lettura di config.json, quindi le tue modifiche non vengono viste. Avvia un server locale (nella cartella: npx serve) oppure caricala su Netlify/Vercel.';
+  else if(e instanceof SyntaxError)msg='config.json ha un errore di sintassi (di solito una virgola di troppo o mancante, o virgolette dimenticate): '+e.message;
+  else msg='Non riesco a usare config.json: '+e.message+'.';
+  box.innerHTML='<b>Sto mostrando i nomi di esempio</b>'+msg;box.hidden=false;
+}
+
+function init(cfg){
+  const $=id=>document.getElementById(id);
+  const t=$('titolo');
+  t.textContent=cfg.azienda||cfg.segnapostoAzienda; if(!cfg.azienda)t.classList.add('vuoto');
+  document.title=cfg.azienda||'Presto in arrivo'; $('slogan').textContent=cfg.slogan||'';
+  const cv=$('c'),ctx=cv.getContext('2d');
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  let W,H,dpr,cx,cy,tilt,stars=[];
+  const T=x=>String(x).split('{azienda}').join(cfg.azienda||cfg.segnapostoAzienda||'INSERTNAME');
+  const norm=c=>{ctx.fillStyle='#000';ctx.fillStyle=String(c||'');const v=ctx.fillStyle;return v[0]==='#'?v:'#8899cc'};
+  const P=cfg.dipartimenti.map((d,i)=>({...d,nome:T(d.nome||'Dipartimento '+(i+1)),descrizione:T(d.descrizione||''),colore:norm(d.colore),dimensione:+d.dimensione||14,velocita:+d.velocita||.3,i,a:i*2.4+.5,sc:1,glow:0,x:0,y:0,r:0,R:0}));
+  let hover=null,sel=null,time=0,speed=1,mx=0,my=0,pmx=0,pmy=0,t0=performance.now(),pings=[];
+
+  function resize(){
+    dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;
+    cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+    cx=W/2;cy=H/2-(W<640?30:0);tilt=W<640?.62:.4;
+    const maxR=Math.min(W*.5-30,(H*.5-90)/tilt);const minR=Math.min(W,H)*.21;
+    P.forEach((p,i)=>p.R=minR+(maxR-minR)*(P.length>1?i/(P.length-1):0));
+    stars=Array.from({length:Math.round(W*H/2800)},()=>({x:Math.random()*W,y:Math.random()*H,z:Math.random()*.9+.1,tw:Math.random()*6}));
+  }
+  addEventListener('resize',resize);resize();
+
+  const mix=(h,a)=>{const n=parseInt(h.slice(1),16);const f=c=>Math.max(0,Math.min(255,Math.round(c+(a>0?(255-c)*a:c*a))));
+    return`rgb(${f(n>>16)},${f(n>>8&255)},${f(n&255)})`};
+
+  // nav chips
+  P.forEach(p=>{const b=document.createElement('button');b.style.setProperty('--c',p.colore);
+    b.innerHTML=`<i></i>${p.nome}`;b.onmouseenter=b.onfocus=()=>hover=p;b.onmouseleave=b.onblur=()=>hover=null;
+    b.onclick=()=>select(p);p.btn=b;$('nav').appendChild(b)});
+
+  function select(p){
+    sel=sel===p?null:p;
+    P.forEach(q=>q.btn.classList.toggle('on',q===sel));
+    const pn=$('panel');
+    if(sel){$('pn').textContent=sel.nome;$('pd').textContent=sel.descrizione||'';pn.style.setProperty('--c',sel.colore);pn.classList.add('open');
+      pings.push({x:sel.x,y:sel.y,t:0,c:sel.colore})}
+    else pn.classList.remove('open');
+  }
+  $('chiudi').onclick=()=>{if(sel)select(sel)};
+  addEventListener('keydown',e=>{if(e.key==='Escape'&&sel)select(sel)});
+
+  function hit(x,y){let best=null,bd=1e9;
+    P.forEach(p=>{const d=Math.hypot(p.x-x,p.y-y);if(d<p.r+16&&d<bd){bd=d;best=p}});return best}
+  cv.addEventListener('pointermove',e=>{mx=e.clientX/W-.5;my=e.clientY/H-.5;hover=hit(e.clientX,e.clientY);cv.classList.toggle('over',!!hover)});
+  cv.addEventListener('pointerdown',e=>{const h=hit(e.clientX,e.clientY);if(h)select(h);else if(sel)select(sel)});
+
+  function drawSun(){
+    const base=Math.min(W,H)*.055,pulse=1+Math.sin(time*1.7)*.035,r=base*pulse;
+    ctx.save();ctx.globalCompositeOperation='lighter';
+    // alone ampio, a due strati
+    let g=ctx.createRadialGradient(cx,cy,r*.8,cx,cy,r*9);
+    g.addColorStop(0,'rgba(255,150,50,.38)');g.addColorStop(.25,'rgba(255,100,30,.14)');g.addColorStop(.6,'rgba(190,60,20,.05)');g.addColorStop(1,'rgba(190,60,20,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r*9,0,7);ctx.fill();
+    g=ctx.createRadialGradient(cx,cy,r*.9,cx,cy,r*3);
+    g.addColorStop(0,'rgba(255,215,130,.55)');g.addColorStop(1,'rgba(255,170,60,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r*3,0,7);ctx.fill();
+    // raggi morbidi che ruotano
+    ctx.translate(cx,cy);
+    for(let k=0;k<14;k++){
+      const ang=k/14*6.283+time*.12*(k%2?1:-1),len=r*(2.6+1.4*Math.sin(time*1.3+k*2.1)),w=r*.16;
+      ctx.save();ctx.rotate(ang);
+      const rg=ctx.createLinearGradient(r*.9,0,len,0);
+      rg.addColorStop(0,'rgba(255,200,110,.38)');rg.addColorStop(1,'rgba(255,140,50,0)');
+      ctx.fillStyle=rg;ctx.beginPath();ctx.moveTo(r*.9,-w);ctx.lineTo(len,0);ctx.lineTo(r*.9,w);ctx.fill();ctx.restore();
+    }
+    ctx.restore();
+    // corpo
+    g=ctx.createRadialGradient(cx-r*.25,cy-r*.25,r*.05,cx,cy,r);
+    g.addColorStop(0,'#fffbe8');g.addColorStop(.35,'#ffe08a');g.addColorStop(.75,'#ffa534');g.addColorStop(1,'#e8601a');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fill();
+    // plasma in movimento, dentro il disco
+    ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.clip();ctx.globalCompositeOperation='lighter';
+    for(let k=0;k<6;k++){
+      const a=time*.25*(k%2?1:-1)+k*1.05,d=r*(.35+.3*Math.sin(time*.6+k)),px=cx+Math.cos(a)*d,py=cy+Math.sin(a)*d,pr=r*(.35+.1*Math.sin(time+k*3));
+      const pg=ctx.createRadialGradient(px,py,0,px,py,pr);pg.addColorStop(0,'rgba(255,240,170,.35)');pg.addColorStop(1,'rgba(255,200,90,0)');
+      ctx.fillStyle=pg;ctx.beginPath();ctx.arc(px,py,pr,0,7);ctx.fill();
+    }
+    ctx.restore();
+    // bordo luminoso
+    ctx.save();ctx.globalCompositeOperation='lighter';
+    g=ctx.createRadialGradient(cx,cy,r*.92,cx,cy,r*1.25);
+    g.addColorStop(0,'rgba(255,190,90,.6)');g.addColorStop(1,'rgba(255,150,50,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r*1.25,0,7);ctx.fill();ctx.restore();
+  }
+
+  function drawPlanet(p,ring){
+    const r=p.r;ctx.save();ctx.translate(p.x,p.y);
+    if(p.glow>.01){const g=ctx.createRadialGradient(0,0,r*.8,0,0,r*3.2);g.addColorStop(0,p.colore+'88');g.addColorStop(1,p.colore+'00');
+      ctx.globalAlpha=p.glow;ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r*3.2,0,7);ctx.fill();ctx.globalAlpha=1}
+    const ringPath=(front)=>{ctx.beginPath();ctx.ellipse(0,0,r*1.9,r*.55,-.35,front?0:Math.PI,front?Math.PI:6.283);ctx.stroke()};
+    if(p.anello){ctx.strokeStyle=mix(p.colore,.3);ctx.lineWidth=r*.14;ctx.globalAlpha=.7;ringPath(false);ctx.globalAlpha=1}
+    const g=ctx.createRadialGradient(-r*.4,-r*.4,r*.1,0,0,r*1.1);
+    g.addColorStop(0,mix(p.colore,.55));g.addColorStop(.55,p.colore);g.addColorStop(1,mix(p.colore,-.7));
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fill();
+    // ombra lato opposto al sole
+    const ang=Math.atan2(p.y-cy,p.x-cx);ctx.save();ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.clip();
+    const sg=ctx.createLinearGradient(-Math.cos(ang)*r,-Math.sin(ang)*r,Math.cos(ang)*r,Math.sin(ang)*r);
+    sg.addColorStop(.35,'rgba(0,0,10,0)');sg.addColorStop(1,'rgba(0,0,10,.65)');ctx.fillStyle=sg;ctx.fillRect(-r,-r,r*2,r*2);ctx.restore();
+    if(p.anello){ctx.strokeStyle=mix(p.colore,.3);ctx.lineWidth=r*.14;ringPath(true)}
+    if(p===sel){ctx.strokeStyle=p.colore;ctx.lineWidth=1.5;ctx.setLineDash([4,6]);ctx.lineDashOffset=-time*14;ctx.beginPath();ctx.arc(0,0,r*2.1+4,0,7);ctx.stroke();ctx.setLineDash([])}
+    ctx.restore();
+    ctx.font=`600 ${W<640?11:13}px "Instrument Sans",sans-serif`;ctx.textAlign='center';
+    ctx.shadowColor='#000';ctx.shadowBlur=6;ctx.fillStyle=`rgba(238,241,255,${.6+.4*p.glow})`;
+    ctx.fillText(p.nome,p.x,p.y+r*1.2+(p.anello?r*.3:0)+16);ctx.shadowBlur=0;
+  }
+
+  let last=t0;
+  function frame(now){
+    const dt=Math.min((now-last)/1000,.05);last=now;
+    const intro=reduce?1:1-Math.pow(1-Math.min((now-t0)/2200,1),4);
+    const target=(hover||sel)?.12:1;speed+=(target-speed)*Math.min(dt*5,1);
+    time+=dt*speed;pmx+=(mx-pmx)*.05;pmy+=(my-pmy)*.05;
+    ctx.clearRect(0,0,W,H);
+    // stelle con parallasse
+    stars.forEach(s=>{const x=s.x-pmx*30*s.z,y=s.y-pmy*30*s.z;
+      ctx.globalAlpha=(.25+.5*s.z)*(.7+.3*Math.sin(time*2+s.tw));ctx.fillStyle='#dfe6ff';ctx.fillRect(x,y,s.z*1.6,s.z*1.6)});
+    ctx.globalAlpha=1;
+    ctx.save();ctx.translate(-pmx*10,-pmy*10);
+    // orbite
+    P.forEach(p=>{const on=p===hover||p===sel;
+      ctx.strokeStyle=on?p.colore:'rgba(160,175,255,.14)';ctx.globalAlpha=on?.8:1;ctx.lineWidth=on?1.6:1;
+      ctx.beginPath();ctx.ellipse(cx,cy,p.R*intro,p.R*tilt*intro,0,0,7);ctx.stroke();ctx.globalAlpha=1});
+    // posizioni
+    P.forEach(p=>{p.a+=dt*speed*p.velocita*(reduce?.2:1);
+      const on=p===hover||p===sel;
+      p.sc+=((on?1.55:1)-p.sc)*Math.min(dt*9,1);p.glow+=((on?1:0)-p.glow)*Math.min(dt*8,1);
+      const R=p.R*intro,s=Math.sin(p.a);
+      p.s=s;p.x=cx+Math.cos(p.a)*R;p.y=cy+s*R*tilt;p.r=(p.dimensione||14)*p.sc*(1+s*.15)*(Math.min(W,H)<500?.8:1)*intro});
+    const ord=P.slice().sort((a,b)=>a.y-b.y);
+    ord.filter(p=>p.s<0).forEach(drawPlanet);
+    drawSun();
+    ord.filter(p=>p.s>=0).forEach(drawPlanet);
+    // onde al clic
+    pings=pings.filter(g=>(g.t+=dt)<1.1);
+    pings.forEach(g=>{ctx.strokeStyle=g.c;ctx.globalAlpha=1-g.t/1.1;ctx.lineWidth=2;ctx.beginPath();ctx.arc(g.x,g.y,10+g.t*90,0,7);ctx.stroke()});
+    ctx.globalAlpha=1;ctx.restore();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>

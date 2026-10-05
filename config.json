@@ -1,0 +1,55 @@
+{
+  "azienda": "",
+  "segnapostoAzienda": "INSERTNAME",
+  "slogan": "Dalla riparazione al software, tutto in un'unica orbita.",
+  "dipartimenti": [
+    {
+      "nome": "{azienda} Repair",
+      "descrizione": "Diagnosi, micro-saldature, riparazione rapida e manutenzione di dispositivi informatici ed elettronici.",
+      "colore": "#ff8a4c",
+      "dimensione": 14,
+      "velocita": 0.5,
+      "anello": false
+    },
+    {
+      "nome": "{azienda} Store",
+      "descrizione": "Vendita di hardware personalizzato, workstation e PC da gioco custom, accessori su ordinazione.",
+      "colore": "#6ea8ff",
+      "dimensione": 16,
+      "velocita": 0.4,
+      "anello": false
+    },
+    {
+      "nome": "{azienda} Renew",
+      "descrizione": "Ritiro, ricondizionamento e vendita certificata con garanzia di dispositivi informatici usati.",
+      "colore": "#4ade80",
+      "dimensione": 15,
+      "velocita": 0.32,
+      "anello": false
+    },
+    {
+      "nome": "{azienda} Business",
+      "descrizione": "Servizi IT gestiti (MSP), contratti di manutenzione preventiva, gestione reti, cloud e sicurezza dati per PMI.",
+      "colore": "#ffc247",
+      "dimensione": 18,
+      "velocita": 0.25,
+      "anello": true
+    },
+    {
+      "nome": "{azienda} Software",
+      "descrizione": "Sviluppo di applicazioni web, siti aziendali, integrazioni API e gestionali su misura.",
+      "colore": "#c084fc",
+      "dimensione": 16,
+      "velocita": 0.19,
+      "anello": false
+    },
+    {
+      "nome": "{azienda} Labs",
+      "descrizione": "Unità di ricerca e sviluppo interna: sperimentazione di automazioni aziendali e prodotti software proprietari (SaaS).",
+      "colore": "#22d3ee",
+      "dimensione": 13,
+      "velocita": 0.14,
+      "anello": true
+    }
+  ]
+}
