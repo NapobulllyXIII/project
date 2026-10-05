@@ -29,6 +29,12 @@ nav button:hover i,nav button.on i{transform:scale(1.5)}
 #panel button{position:absolute;top:12px;right:14px;background:none;border:0;color:var(--dim);font-size:1.4rem;cursor:pointer;line-height:1}
 #panel button:hover{color:var(--ink)}
 @media (max-width:640px){#panel{right:50%;top:auto;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translate(50%,40px) scale(.96)}#panel.open{transform:translate(50%,0) scale(1)}header{padding-inline:20px}}
+#cnt{position:fixed;z-index:2;top:calc(22px + env(safe-area-inset-top,0px));right:24px;display:flex;align-items:center;padding:8px;border-radius:99px;border:1px solid transparent;opacity:.25;color:var(--dim);font-size:.8rem;outline:none;transition:opacity .4s,background .4s,border-color .4s,padding .4s,gap .4s}
+#cnt i{width:6px;height:6px;border-radius:50%;background:var(--ink);box-shadow:0 0 8px var(--ink)}
+#cnt span{max-width:0;overflow:hidden;white-space:nowrap;transition:max-width .6s cubic-bezier(.2,.9,.2,1)}
+#cnt:hover,#cnt:focus{opacity:1;gap:8px;padding-inline:12px;background:rgba(15,18,40,.65);border-color:rgba(255,255,255,.14)}
+#cnt:hover span,#cnt:focus span{max-width:170px}
+#cnt[hidden]{display:none}
 #err{position:fixed;z-index:5;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);width:min(560px,calc(100vw - 32px));padding:14px 18px;border-radius:14px;background:rgba(60,12,20,.9);border:1px solid #ff6b81;color:#ffd9de;font-size:.9rem;line-height:1.5;backdrop-filter:blur(8px)}
 #err b{display:block;margin-bottom:4px;color:#fff}
 #err[hidden]{display:none}
@@ -39,6 +45,7 @@ nav button:hover i,nav button.on i{transform:scale(1.5)}
 <canvas id="c" aria-hidden="true"></canvas>
 <header><h1 id="titolo"></h1><p id="slogan"></p></header>
 <aside id="panel" role="dialog" aria-live="polite"><button id="chiudi" aria-label="Chiudi">&times;</button><h2 id="pn"></h2><p id="pd"></p></aside>
+<div id="cnt" hidden tabindex="0" aria-label="Visite totali"><i></i><span></span></div>
 <div id="err" role="alert" hidden></div>
 <nav id="nav" aria-label="Dipartimenti"></nav>
 <script>
@@ -69,6 +76,17 @@ function init(cfg){
   const t=$('titolo');
   t.textContent=cfg.azienda||cfg.segnapostoAzienda; if(!cfg.azienda)t.classList.add('vuoto');
   document.title=cfg.azienda||'Presto in arrivo'; $('slogan').textContent=cfg.slogan||'';
+  function setupCounter(code){
+    const el=$('cnt'),sp=el.querySelector('span');
+    const sc=document.createElement('script');sc.async=true;sc.dataset.goatcounter='https://'+code+'.goatcounter.com/count';sc.src='//gc.zgo.at/count.js';document.head.appendChild(sc);
+    let n=null,shown=false;
+    setTimeout(()=>fetch('https://'+code+'.goatcounter.com/counter/TOTAL.json').then(r=>r.json()).then(j=>{
+      n=parseInt(String(j.count).replace(/\D/g,''),10);if(!isNaN(n))el.hidden=false}).catch(()=>{}),1800);
+    const show=()=>{if(n==null||shown)return;shown=true;const t0=performance.now();
+      (function f(now){const k=Math.min((now-t0)/900,1);sp.textContent=Math.round(n*(1-Math.pow(1-k,3))).toLocaleString('it-IT')+' visite';if(k<1)requestAnimationFrame(f)})(t0)};
+    el.addEventListener('pointerenter',show);el.addEventListener('focus',show);
+  }
+  const code=cfg.contatore&&String(cfg.contatore.goatcounter||'').trim();if(code)setupCounter(code);
   const cv=$('c'),ctx=cv.getContext('2d');
   const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
   let W,H,dpr,cx,cy,tilt,stars=[];
